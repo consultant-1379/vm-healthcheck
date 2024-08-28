@@ -1,0 +1,143 @@
+
+1. Script location, config file, keys and logs :
+
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+[nmaasuser@nmaasScriptbox monitoring_nfs]$ pwd
+/home/nmaasuser/monitoring_nfs
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+[nmaasuser@nmaasScriptbox monitoring_nfs]$ ll
+total 76
+drwxr-xr-x. 2 nmaasuser nmaasuser  4096 Aug 16 10:05 keys
+drwxrwxr-x. 2 nmaasuser nmaasuser   224 Aug 19 09:01 logs
+-rw-r--r--. 1 nmaasuser nmaasuser   342 Aug 16 10:07 nfs_mount_check.cfg
+-rw-r--r--. 1 nmaasuser nmaasuser  1200 Aug 15 13:15 nfs_mount_check.cfg.all
+-rw-rw-r--. 1 nmaasuser nmaasuser 16936 Aug 16 14:47 nfs_mount_check_for_deployment.py
+-rw-r--r--. 1 nmaasuser nmaasuser 16225 Aug 16 14:44 nfs_mount_check.py
+-rw-r--r--. 1 nmaasuser nmaasuser 25502 Aug 16 14:47 nfs_mount_check_trigger.py
+drwxrwxr-x. 3 nmaasuser nmaasuser    28 Aug 15 13:57 rfpsmallstaging
+drwxrwxr-x. 3 nmaasuser nmaasuser    28 Aug 16 10:15 Staging01
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+[nmaasuser@nmaasScriptbox monitoring_nfs]$ cat nfs_mount_check.cfg
+[DEFAULT]
+EMAIL_TO=sanketkumar.bengali@ericsson.com
+EMAIL_URL=https://172.31.2.5/v1/emailservice/send
+
+[rfpsmallstaging]
+#key=/home/rfpsmallstaging/key/rfpsmallstaging_cu_key.pem
+key=~/monitoring_nfs/keys/rfpsmallstaging_cu_key.pem
+ips=10.100.130.17, 10.100.130.10
+
+[Staging01]
+key=~/monitoring_nfs/keys/stag01.pem
+ips=10.2.10.16, 10.2.10.10
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+[nmaasuser@nmaasScriptbox monitoring_nfs]$ ll logs/
+total 120
+-rw-rw-r--. 1 nmaasuser nmaasuser 10940 Aug 19 10:08 nfs_mount_check_for_deployment.py.rfpsmallstaging.log
+-rw-rw-r--. 1 nmaasuser nmaasuser  7520 Aug 19 09:35 nfs_mount_check_for_deployment.py.Staging01.log
+-rw-rw-r--. 1 nmaasuser nmaasuser 50402 Aug 19 10:09 nfs_mount_check_trigger.py.rfpsmallstaging.log
+-rw-rw-r--. 1 nmaasuser nmaasuser 49103 Aug 19 09:53 nfs_mount_check_trigger.py.Staging01.log
+[nmaasuser@nmaasScriptbox monitoring_nfs]$
+
+
+NOTES :
+
+a. Store keys into "keys" dir
+
+b. In the "nfs_mount_check.cfg" file, IPs are store in this format : ips=<emp_node>,<laf_node>
+
+c. 3 scripts :
+
+i. nfs_mount_check_for_deployment.py : The main script defined in Cron job, that checks if "nfs_mount_check_trigger.py" is running for a particular deployment or not. If not, then execute it.
+
+ii. nfs_mount_check_trigger.py : The script which gets *_definition.yaml from LAF, parses and copies NFS share details to EMP node, and executes a script on EMP node.
+
+iii. nfs_mount_check.py : Executed on EMP node of a given deployment, which checks NFS share mounts with "df -k" and "touch xxx" commands for each entry on each NFS client.
+
+d. Logs are stored in "logs" dir for each deployment :
+
+-> nfs_mount_check_for_deployment.py.<deployment_name>.log : For nfs_mount_check_for_deployment.py
+
+-> nfs_mount_check_trigger.py.<deployment_name>.log : For nfs_mount_check_trigger.py
+
+
+2. Script execution :
+
+/usr/bin/python ~/monitoring_nfs/nfs_mount_check_for_deployment.py <deployment_name>
+
+/usr/bin/python ~/monitoring_nfs/nfs_mount_check_for_deployment.py rfpsmallstaging
+
+Cron example :
+ */30 * * * * /usr/bin/python ~/monitoring_nfs/nfs_mount_check_for_deployment.py rfpsmallstaging
+
+
+3. NOTES regarding NFS shares mount checks :
+
+a. Ignored defnition.yaml files :
+
+# There is no matching "consul member" for these entries. Hence, skip it.
+
+DEFINITION_FILE_IGNORE_LIST = ["_custom_application_name_definition.yaml",
+                               "fm_definition.yaml"]
+
+b. *_definition.yaml to consul member name mapping :
+
+# For certain *_definition.yaml file, there is a mismatch between that name and ENM node in the output of "consul members"
+# For ex: "presentation_definition.yaml" -> "presentation" -> "uiserv"
+# DEFINITION_TO_CONSUL_MEMBER_MAPPING includes the mapping of all such servers
+
+DEFINITION_TO_CONSUL_MEMBER_MAPPING = {"haproxyint": "haproxy-int",
+                                       "haproxysb": "haproxy-sb",
+                                       "lvs": "lvsrouter",
+                                       "nfsnorollback": "nfsnrbk",
+                                       "nfspmlinks": "nfspmlink",
+                                       "presentation": "uiserv",
+                                       "scripting": "scp",
+                                       "security": "secserv",
+                                       "serviceregistry": "servicereg"}
+
+c. List of NFS servers/clients that are excluded from check :
+
+# Ignoring NFS mount check for nodes defined in ENM_NODES_IGNORE_NFS_MOUNT_CHECKLIST
+# Because it gives error: [sudo: sorry, you must have a tty to run sudo]
+
+ENM_NODES_IGNORE_NFS_MOUNT_CHECKLIST = ["nfspmlink", "nfsnrbk", "nfscommon",
+                                        "nfspm", "nfssmrs", "repo", "lvsrouter", "emp"]
+
+d. Invalid mount entries in "presentation_definition.yaml" file :
+
+# Ignore below 4 mount paths for 'uiserv', due to below error :
+# touch: cannot touch `/ericsson/batch/.nfs_check': No such file or directory
+# touch: cannot touch `/ericsson/symvol/.nfs_check': No such file or directory
+# touch: cannot touch `/ericsson/tor/smrs/.nfs_check': No such file or directory
+# touch: cannot touch `/ericsson/config_mgt/.nfs_check': No such file or directory
+
+UISERV_IGNORE_MOUNT_SHARES_LIST = ["/ericsson/batch",
+                                   "/ericsson/symvol",
+                                   "/ericsson/tor/smrs",
+                                   "/ericsson/config_mgt"]
+
+
+4. Scripts and logs on EMP node :
+
+[cloud-user@rfpsmallstaging-emp-0 ~]$
+[cloud-user@rfpsmallstaging-emp-0 ~]$ pwd
+/home/cloud-user
+[cloud-user@rfpsmallstaging-emp-0 ~]$
+[cloud-user@rfpsmallstaging-emp-0 ~]$
+[cloud-user@rfpsmallstaging-emp-0 ~]$ ll
+total 8
+drwxrwxr-x. 2 cloud-user cloud-user 4096 Aug 19 09:44 monitoring_nfs
+-rw-------. 1 cloud-user cloud-user 1679 Aug 16 14:39 rfpsmallstaging_cu_key.pem
+[cloud-user@rfpsmallstaging-emp-0 ~]$
+[cloud-user@rfpsmallstaging-emp-0 ~]$ cd monitoring_nfs/
+[cloud-user@rfpsmallstaging-emp-0 monitoring_nfs]$
+[cloud-user@rfpsmallstaging-emp-0 monitoring_nfs]$
+[cloud-user@rfpsmallstaging-emp-0 monitoring_nfs]$ ll
+total 680
+-rw-rw-r--. 1 cloud-user cloud-user 133179 Aug 19 10:54 nfs_client_shares.json
+-rw-r--r--. 1 cloud-user cloud-user  16225 Aug 19 10:54 nfs_mount_check.py
+-rw-rw-r--. 1 cloud-user cloud-user 539832 Aug 19 11:09 nfs_mount_check.py.log
+-rw-------. 1 cloud-user cloud-user   1679 Aug 19 10:54 rfpsmallstaging_cu_key.pem
+[cloud-user@rfpsmallstaging-emp-0 monitoring_nfs]$

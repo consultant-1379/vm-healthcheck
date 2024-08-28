@@ -1,0 +1,95 @@
+===================================================================
+STACK HEALTH MONITORING SCRIPT
+===================================================================
+Script Location
+-------------------------------------------------------------------
+The script can be run from the genie-utility server as a root user. 
+Script Home Directory: /home/stack_health_check_local
+See the ‘contents’ section to know more about mandatory files within the script directory.
+
+
+Usage
+-------------------------------------------------------------------
+./stack-health-monitor.py deployment_name [--update-inputs] [--no-update-inputs]                               
+
+positional arguments:
+deployment_name     Provide deployment name.
+
+optional arguments:
+-h, --help          show this help message and exit
+
+--update-inputs	    To update the sed.json and cloud template files.
+ 		    This option downloads the latest files from LAF server.
+
+--no-update-inputs  To use the already downloaded sed.json and cloud template files. 
+		    Cannot use this option when running the script for the first time. 
+		    This is the default option. If both optional arguments are not specified, 
+		    then this option is considered. 
+
+
+Pre-requisites
+-------------------------------------------------------------------
+1.	Ensure that keystone.sh file is sourced for the corresponding deployment.
+	$ source keystone.sh
+	
+	Keystone files can usually be found at location: /home/{deployment-name}/rc/keystone.sh.
+
+2.	Ensure that the deployment name given as script argument is aligned with config file.
+
+
+
+Description
+-------------------------------------------------------------------
+The script is responsible for monitoring the health of all stacks, nested stacks and resources in a given ENM deployment. 
+It verifies all parameters in the running stack with the latest sed.json and yaml templates.
+The following checks are covered in this script:
+
+1.	All stack parameters are verified against template files.
+2.	Values of all SED parameters in the stack are verified against latest sed.json.
+3.	All tags (key-values) are verified in each stack and compared against deployment name and service name.
+4.	OS:Stack Name parameter value is verified against each stack name.
+5.	Health status of all stacks and nested stacks are verified to be either CREATE_ COMPLETE or UPDATE_COMPLETE.
+6.	Status of all volume attachments verified to be “In-use”
+
+
+Task Description
+-------------------------------------------------------------------
+Script follows the below work-flow:
+1. 	Automated copy of sed.json and cloud templates
+   	Copying the latest sed.json file and cloud templates from the LAF server for each deployment. This action can be controlled by a parsed argument. 
+   	The remote files are copied to a dynamically generated folder “deployment_name” under the script home directory
+
+2. 	Monitor health for all stacks in current deployment
+   	All parameters verified against template files
+   	Values of all SED parameters in stack are verified
+   	All Tags are verified
+   	Parameter OS::Stack Name verified
+
+3. 	Check Nested stack status.
+   	Verifies if all Nested Stack Health OK. Status is either UPDATE COMPLETE or CREATE COMPLETE
+
+4. 	Checks Volume attachment status
+  	Status of all Volume Attachments verified to be “In use”
+
+
+Contents
+-------------------------------------------------------------------
+The script can be run from the genie-utility server as a root user. 
+Script folder: /home/stack_health_check_local
+The script folder contains the following mandatory files:
+1.	stack-health-monitor.py – this is the script file which needs to be executed. Usage is described in the above section
+
+2.	stack_monitor.cfg – Configuration file which contains the config details for each deployment in the below format
+	[Deployment Name]
+	key=<full path to the pem key file to access the LAF server>
+	ips=<EMP Node IP>, <LAF Server IP>
+
+3.	keys/ - Keys for all deployments are stored in this directory
+
+4.	Sed_Exception_Parameters.txt – Stack parameters (keys) are checked to be present in sed file by default. 
+	If any stack parameter needs to be excluded from this check, please include in this text file in a new line.
+
+5.	logs/ - Logs for each script execution is generated in the log folder. Each log is dynamically generated with the date-time stamp. 
+	Log rotation is taken care of if the logging is huge.
+	Stack_monitoring-<deployment-name>-<time-stamp-of-execution-start>.log
+	Eg: stack_monitoring-ftcenm01-20190903-151614.log

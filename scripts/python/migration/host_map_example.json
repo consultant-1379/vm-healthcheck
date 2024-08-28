@@ -1,0 +1,18 @@
+{
+    "921234-compute004.localdomain": [
+        "staging01-supervc-0",
+        "staging01-mspm-1",
+        "staging01-flsserv-0"
+    ],
+    "921237-compute007.localdomain": [
+        "staging01-ops-1",
+        "staging01-msap-1",
+        "staging01-cmevents-1"
+    ],
+    "929237-compute024.localdomain": [
+        "staging01-visinamingsb-0",
+        "staging01-mssnmpfm-1",
+        "staging01-impexpserv-1",
+        "staging01-httpd-1"
+    ]
+}
